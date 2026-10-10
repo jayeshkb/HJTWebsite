@@ -1,0 +1,680 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RoleCode {
+  SUPER_ADMIN
+  ADMIN
+  CONTENT_EDITOR
+  FINANCE
+}
+
+enum EventCategory {
+  FESTIVAL
+  PUJA
+  CULTURAL
+  EDUCATION
+  COMMUNITY
+  OTHER
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PriestRequestStatus {
+  SUBMITTED
+  CONTACTED
+  AVAILABILITY_CONFIRMED
+  PAYMENT_PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceLocation {
+  TEMPLE
+  HOME
+  OTHER
+}
+
+enum HallReservationStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PAYMENT_PENDING
+  CONFIRMED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  LAPSED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  ONLINE
+  CASH
+  CHECK
+  OTHER
+}
+
+enum PaymentProvider {
+  PAYPAL
+  MANUAL
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentTransactionType {
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  VOIDED
+  MANUAL_RECEIPT
+}
+
+enum ContactStatus {
+  NEW
+  IN_REVIEW
+  RESPONDED
+  ARCHIVED
+}
+
+model User {
+  id               String     @id @default(cuid())
+  name             String
+  email            String     @unique
+  emailVerified    Boolean    @default(false)
+  image            String?
+  twoFactorEnabled Boolean    @default(false)
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+  sessions         Session[]
+  accounts         Account[]
+  twoFactor        TwoFactor?
+  adminProfile     AdminUser?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime @db.Timestamptz(3)
+  token     String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([identifier])
+}
+
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  secret                  String    @db.Text
+  backupCodes             String    @db.Text
+  verified                Boolean   @default(false)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime? @db.Timestamptz(3)
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminUser {
+  id                 String                  @id @default(cuid())
+  userId             String                  @unique
+  active             Boolean                 @default(true)
+  createdAt          DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roles              AdminUserRole[]
+  auditLogs          AuditLog[]              @relation("AuditActor")
+  paymentRecords     Payment[]               @relation("PaymentRecordedBy")
+  transactionRecords PaymentTransaction[]    @relation("TransactionRecordedBy")
+  createdBlocks      HallAvailabilityBlock[] @relation("BlockCreatedBy")
+  handledContacts    ContactSubmission[]     @relation("ContactHandledBy")
+
+  @@index([active])
+}
+
+model Role {
+  id          String          @id @default(cuid())
+  code        RoleCode        @unique
+  name        String
+  assignments AdminUserRole[]
+}
+
+model AdminUserRole {
+  adminUserId String
+  roleId      String
+  assignedAt  DateTime  @default(now()) @db.Timestamptz(3)
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([adminUserId, roleId])
+  @@index([roleId])
+}
+
+model Event {
+  id                   String         @id @default(cuid())
+  title                String
+  slug                 String         @unique
+  shortDescription     String         @db.VarChar(500)
+  fullDescription      String?        @db.Text
+  startsAt             DateTime       @db.Timestamptz(3)
+  endsAt               DateTime?      @db.Timestamptz(3)
+  location             String?
+  featuredImageUrl     String?
+  category             EventCategory  @default(OTHER)
+  registrationUrl      String?
+  registrationRequired Boolean        @default(false)
+  featured             Boolean        @default(false)
+  status               ContentStatus  @default(DRAFT)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
+  albums               GalleryAlbum[]
+  announcements        Announcement[]
+
+  @@index([status, startsAt])
+  @@index([featured, startsAt])
+}
+
+model Announcement {
+  id             String               @id @default(cuid())
+  title          String
+  message        String               @db.Text
+  publishAt      DateTime             @db.Timestamptz(3)
+  expiresAt      DateTime?            @db.Timestamptz(3)
+  priority       AnnouncementPriority @default(NORMAL)
+  active         Boolean              @default(true)
+  linkUrl        String?
+  eventId        String?
+  vidyaProgramId String?
+  event          Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  vidyaProgram   VidyaProgram?        @relation(fields: [vidyaProgramId], references: [id], onDelete: SetNull)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
+
+  @@index([active, publishAt, expiresAt])
+}
+
+model PriestServiceType {
+  id                 String          @id @default(cuid())
+  name               String
+  description        String?         @db.Text
+  defaultAmountMinor Int?
+  currency           String          @default("USD") @db.Char(3)
+  active             Boolean         @default(true)
+  requests           PriestRequest[]
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([active, name])
+}
+
+model PriestRequest {
+  id                String              @id @default(cuid())
+  name              String
+  email             String
+  phone             String
+  serviceTypeId     String?
+  serviceRequested  String
+  preferredAt       DateTime            @db.Timestamptz(3)
+  alternateAt       DateTime?           @db.Timestamptz(3)
+  preferredTimeText String?
+  location          ServiceLocation
+  address           String?             @db.Text
+  additionalDetails String?             @db.Text
+  status            PriestRequestStatus @default(SUBMITTED)
+  serviceType       PriestServiceType?  @relation(fields: [serviceTypeId], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([status, preferredAt])
+  @@index([createdAt])
+}
+
+model Hall {
+  id                 String                  @id @default(cuid())
+  name               String
+  description        String                  @db.Text
+  capacity           Int
+  active             Boolean                 @default(true)
+  images             HallImage[]
+  amenities          HallAmenity[]
+  rentalRules        HallRentalRule[]
+  pricing            HallPricing[]
+  availabilityBlocks HallAvailabilityBlock[]
+  reservations       HallReservation[]
+  createdAt          DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
+
+  @@index([active, name])
+}
+
+model HallImage {
+  id           String @id @default(cuid())
+  hallId       String
+  imageUrl     String
+  altText      String
+  displayOrder Int    @default(0)
+  hall         Hall   @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  @@index([hallId, displayOrder])
+}
+
+model HallAmenity {
+  id     String @id @default(cuid())
+  hallId String
+  name   String
+  hall   Hall   @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  @@unique([hallId, name])
+}
+
+model HallRentalRule {
+  id           String  @id @default(cuid())
+  hallId       String
+  title        String
+  description  String  @db.Text
+  displayOrder Int     @default(0)
+  active       Boolean @default(true)
+  hall         Hall    @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  @@index([hallId, active, displayOrder])
+}
+
+model HallPricing {
+  id             String    @id @default(cuid())
+  hallId         String
+  name           String
+  description    String?   @db.Text
+  amountMinor    Int
+  currency       String    @default("USD") @db.Char(3)
+  unit           String
+  effectiveFrom  DateTime? @db.Timestamptz(3)
+  effectiveUntil DateTime? @db.Timestamptz(3)
+  active         Boolean   @default(true)
+  hall           Hall      @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  @@index([hallId, active, effectiveFrom, effectiveUntil])
+}
+
+model HallAvailabilityBlock {
+  id          String     @id @default(cuid())
+  hallId      String
+  startsAt    DateTime   @db.Timestamptz(3)
+  endsAt      DateTime   @db.Timestamptz(3)
+  reason      String
+  createdById String?
+  hall        Hall       @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  createdBy   AdminUser? @relation("BlockCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([hallId, startsAt, endsAt])
+}
+
+model HallReservation {
+  id                 String                @id @default(cuid())
+  hallId             String
+  name               String
+  email              String
+  phone              String
+  startsAt           DateTime              @db.Timestamptz(3)
+  endsAt             DateTime              @db.Timestamptz(3)
+  eventType          String
+  expectedAttendance Int
+  notes              String?               @db.Text
+  status             HallReservationStatus @default(REQUESTED)
+  hall               Hall                  @relation(fields: [hallId], references: [id], onDelete: Restrict)
+  payments           Payment[]
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([hallId, status, startsAt, endsAt])
+  @@index([status, startsAt])
+}
+
+model MembershipType {
+  id          String       @id @default(cuid())
+  name        String
+  description String       @db.Text
+  amountMinor Int?
+  currency    String       @default("USD") @db.Char(3)
+  active      Boolean      @default(true)
+  memberships Membership[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@index([active, name])
+}
+
+model Member {
+  id              String             @id @default(cuid())
+  firstName       String
+  lastName        String
+  spouseName      String?
+  organization    String?
+  address         String?
+  city            String?
+  state           String?
+  postalCode      String?
+  country         String             @default("US")
+  phone           String
+  email           String
+  memberships     Membership[]       @relation("PrimaryMember")
+  heldMemberships MembershipHolder[]
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([lastName, firstName])
+  @@index([email])
+}
+
+model Membership {
+  id               String             @id @default(cuid())
+  primaryMemberId  String
+  membershipTypeId String
+  membershipYear   Int
+  amountMinor      Int
+  currency         String             @default("USD") @db.Char(3)
+  status           MembershipStatus   @default(PENDING)
+  submittedAt      DateTime           @default(now()) @db.Timestamptz(3)
+  primaryMember    Member             @relation("PrimaryMember", fields: [primaryMemberId], references: [id], onDelete: Restrict)
+  membershipType   MembershipType     @relation(fields: [membershipTypeId], references: [id], onDelete: Restrict)
+  holders          MembershipHolder[]
+  payments         Payment[]
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@unique([primaryMemberId, membershipTypeId, membershipYear])
+  @@index([status, membershipYear])
+}
+
+model MembershipHolder {
+  membershipId String
+  memberId     String
+  votingMember Boolean    @default(true)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  member       Member     @relation(fields: [memberId], references: [id], onDelete: Restrict)
+
+  @@id([membershipId, memberId])
+  @@index([memberId])
+}
+
+model DonationFund {
+  id          String     @id @default(cuid())
+  name        String
+  description String     @db.Text
+  active      Boolean    @default(true)
+  donations   Donation[]
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+
+  @@index([active, name])
+}
+
+model Donor {
+  id         String     @id @default(cuid())
+  firstName  String?
+  lastName   String?
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  postalCode String?
+  country    String?
+  donations  Donation[]
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([email])
+}
+
+model Donation {
+  id          String       @id @default(cuid())
+  fundId      String
+  donorId     String?
+  amountMinor Int
+  currency    String       @default("USD") @db.Char(3)
+  anonymous   Boolean      @default(false)
+  dedication  String?
+  message     String?      @db.Text
+  fund        DonationFund @relation(fields: [fundId], references: [id], onDelete: Restrict)
+  donor       Donor?       @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  payments    Payment[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([fundId, createdAt])
+  @@index([createdAt])
+}
+
+model Payment {
+  id                String               @id @default(cuid())
+  amountMinor       Int
+  currency          String               @default("USD") @db.Char(3)
+  method            PaymentMethod
+  provider          PaymentProvider
+  status            PaymentStatus        @default(PENDING)
+  providerReference String?
+  paymentDate       DateTime?            @db.Timestamptz(3)
+  notes             String?              @db.Text
+  donationId        String?
+  membershipId      String?
+  hallReservationId String?
+  priestRequestId   String?
+  recordedById      String?
+  donation          Donation?            @relation(fields: [donationId], references: [id], onDelete: Restrict)
+  membership        Membership?          @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  hallReservation   HallReservation?     @relation(fields: [hallReservationId], references: [id], onDelete: Restrict)
+  priestRequest     PriestRequest?       @relation(fields: [priestRequestId], references: [id], onDelete: Restrict)
+  recordedBy        AdminUser?           @relation("PaymentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  transactions      PaymentTransaction[]
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@index([provider, providerReference])
+  @@index([recordedById, paymentDate])
+}
+
+model PaymentTransaction {
+  id                String                 @id @default(cuid())
+  paymentId         String
+  type              PaymentTransactionType
+  status            PaymentStatus
+  amountMinor       Int
+  currency          String                 @default("USD") @db.Char(3)
+  providerReference String?
+  note              String?                @db.Text
+  recordedById      String?
+  payment           Payment                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  recordedBy        AdminUser?             @relation("TransactionRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  occurredAt        DateTime               @default(now()) @db.Timestamptz(3)
+
+  @@index([paymentId, occurredAt])
+  @@index([providerReference])
+}
+
+model GalleryAlbum {
+  id            String         @id @default(cuid())
+  title         String
+  slug          String         @unique
+  description   String?        @db.Text
+  eventDate     DateTime?      @db.Timestamptz(3)
+  coverImageUrl String?
+  status        ContentStatus  @default(DRAFT)
+  eventId       String?
+  event         Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  images        GalleryImage[]
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([status, eventDate])
+}
+
+model GalleryImage {
+  id           String       @id @default(cuid())
+  albumId      String
+  imageUrl     String
+  caption      String?
+  altText      String
+  displayOrder Int          @default(0)
+  album        GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([albumId, displayOrder])
+}
+
+model ContactSubmission {
+  id          String        @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  message     String        @db.Text
+  status      ContactStatus @default(NEW)
+  handledById String?
+  handledBy   AdminUser?    @relation("ContactHandledBy", fields: [handledById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+}
+
+model SiteContent {
+  id        String               @id @default(cuid())
+  key       String               @unique
+  title     String
+  body      String               @db.Text
+  status    ContentStatus        @default(DRAFT)
+  versions  SiteContentVersion[]
+  createdAt DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime             @updatedAt @db.Timestamptz(3)
+}
+
+model SiteContentVersion {
+  id            String      @id @default(cuid())
+  siteContentId String
+  title         String
+  body          String      @db.Text
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+  siteContent   SiteContent @relation(fields: [siteContentId], references: [id], onDelete: Cascade)
+
+  @@index([siteContentId, createdAt])
+}
+
+model VidyaProgram {
+  id               String         @id @default(cuid())
+  title            String
+  description      String         @db.Text
+  registrationInfo String?        @db.Text
+  contactEmail     String?
+  active           Boolean        @default(true)
+  classes          VidyaClass[]
+  announcements    Announcement[]
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([active, title])
+}
+
+model VidyaClass {
+  id          String         @id @default(cuid())
+  programId   String
+  title       String
+  description String?        @db.Text
+  active      Boolean        @default(true)
+  program     VidyaProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sessions    VidyaSession[]
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([programId, active])
+}
+
+model VidyaSession {
+  id       String     @id @default(cuid())
+  classId  String
+  startsAt DateTime   @db.Timestamptz(3)
+  endsAt   DateTime?  @db.Timestamptz(3)
+  location String?
+  notes    String?    @db.Text
+  class    VidyaClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([classId, startsAt])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  adminUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  adminUser   AdminUser? @relation("AuditActor", fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([adminUserId, createdAt])
+  @@index([createdAt])
+}
