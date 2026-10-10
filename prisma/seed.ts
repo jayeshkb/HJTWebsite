@@ -138,8 +138,7 @@ async function seedDemoContent() {
   }
 
   const albumRecords = [
-    { id: "demo-gallery-diwali", slug: "demo-diwali", title: "DEMO: Diwali celebration" },
-    { id: "demo-gallery-vidya", slug: "demo-vidya-mandir", title: "DEMO: Vidya Mandir" },
+    { id: "demo-gallery-temple", slug: "demo-temple-exterior", title: "DEMO: Temple exterior" },
   ];
 
   for (const album of albumRecords) {
@@ -147,13 +146,35 @@ async function seedDemoContent() {
       where: { slug: album.slug },
       update: {
         title: album.title,
-        description: "DEMO CONTENT: Add reviewed, rights-cleared images and captions.",
-        status: "DRAFT",
+        description: "DEMO CONTENT: Replace this sample album with temple-approved photographs and captions.",
+        coverImageUrl: "/temple-front.jpg",
+        status: "PUBLISHED",
       },
       create: {
         ...album,
-        description: "DEMO CONTENT: Add reviewed, rights-cleared images and captions.",
-        status: "DRAFT",
+        description: "DEMO CONTENT: Replace this sample album with temple-approved photographs and captions.",
+        coverImageUrl: "/temple-front.jpg",
+        status: "PUBLISHED",
+      },
+    });
+
+    const savedAlbum = await prisma.galleryAlbum.findUniqueOrThrow({ where: { slug: album.slug } });
+    await prisma.galleryImage.upsert({
+      where: { id: "demo-gallery-temple-front-image" },
+      update: {
+        albumId: savedAlbum.id,
+        imageUrl: "/temple-front.jpg",
+        altText: "DEMO: Exterior of the Hindu-Jain Temple",
+        caption: "DEMO: Replace with an approved caption.",
+        displayOrder: 0,
+      },
+      create: {
+        id: "demo-gallery-temple-front-image",
+        albumId: savedAlbum.id,
+        imageUrl: "/temple-front.jpg",
+        altText: "DEMO: Exterior of the Hindu-Jain Temple",
+        caption: "DEMO: Replace with an approved caption.",
+        displayOrder: 0,
       },
     });
   }

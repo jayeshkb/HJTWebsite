@@ -11,6 +11,7 @@
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "dotenv -e .env.local -- prisma studio",
+    "admin:create-first": "dotenv -e .env.local -- tsx scripts/create-first-admin.ts",
     "db:seed": "prisma db seed",
     "db:seed:local": "dotenv -e .env.local -- prisma db seed"
   },

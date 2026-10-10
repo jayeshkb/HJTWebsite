@@ -29,10 +29,13 @@ npm run db:seed:local
 ```
 
 The seed does not create administrator accounts or payment records. For deployment environments with injected variables, use `npm run db:seed`; it creates role definitions and skips demo content unless the development-only guard passes.
+Demo events, the homepage announcement, and the sample gallery album are public when they are seeded. Do not run the opt-in demo seed against a production database unless you intend those clearly labeled samples to appear on the public site.
 
 ## Authentication and Providers
 
 Administrator credentials and sessions are handled by Better Auth and PostgreSQL. Public sign-up is disabled. Two-factor support is configured for TOTP; administrator enrollment and account invitation workflows must be completed before production access is enabled. All admin data operations must use server-side permission checks from `src/lib/auth/permissions.ts`.
+
+To create the first administrator in a freshly migrated database, run `npm run admin:create-first` from an interactive terminal. The command prompts for the administrator name and email, then securely prompts for a password (12-128 characters) and assigns the `SUPER_ADMIN` role. It refuses to run once any administrator exists. If local development and production share a database, this creates a production administrator too.
 
 PayPal, email delivery, and object storage are represented by provider interfaces under `src/lib/`. Their production adapters require the corresponding environment variables from `.env.example`; no payment, email, or upload credentials are needed to build the public site.
 
