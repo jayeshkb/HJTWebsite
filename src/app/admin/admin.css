@@ -313,6 +313,31 @@
   border-bottom: 0;
 }
 
+.admin-event-record > div {
+  width: min(100%, 48rem);
+  min-width: 0;
+}
+
+.admin-event-promotion-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-event-promotion-form .admin-form-field {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.admin-event-promotion-form .admin-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+}
+
 .admin-record h3 {
   margin: 0 0 0.25rem;
   color: var(--color-maroon-deep);

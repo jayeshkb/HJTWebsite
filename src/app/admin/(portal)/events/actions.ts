@@ -10,6 +10,19 @@ import { requireAdminPermission } from "@/lib/auth/permissions";
 
 const localDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
+const eventImageSchema = z.string().trim().max(2048).refine((value) => {
+  if (!value || (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"))) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && (
+      (url.hostname === "www.hindujaintemple.org" && url.pathname.startsWith("/images/"))
+      || url.hostname.endsWith(".public.blob.vercel-storage.com")
+    );
+  } catch {
+    return false;
+  }
+});
+
 const eventSchema = z.object({
   title: z.string().trim().min(3).max(160),
   slug: z.string().trim().max(180).optional(),
@@ -21,6 +34,7 @@ const eventSchema = z.object({
   category: z.enum(EventCategory),
   registrationUrl: z.union([z.url(), z.literal("")]).optional(),
   registrationRequired: z.boolean(),
+  featuredImageUrl: eventImageSchema.optional(),
   featured: z.boolean(),
   publishNow: z.boolean(),
 });
@@ -51,6 +65,7 @@ export async function createEvent(formData: FormData) {
     category: formData.get("category"),
     registrationUrl: formData.get("registrationUrl") || undefined,
     registrationRequired: readCheckbox(formData, "registrationRequired"),
+    featuredImageUrl: formData.get("featuredImageUrl") || undefined,
     featured: readCheckbox(formData, "featured"),
     publishNow: readCheckbox(formData, "publishNow"),
   });
@@ -84,6 +99,7 @@ export async function createEvent(formData: FormData) {
           category: parsed.data.category,
           registrationUrl: parsed.data.registrationUrl || null,
           registrationRequired: parsed.data.registrationRequired,
+          featuredImageUrl: parsed.data.featuredImageUrl || null,
           featured: parsed.data.featured,
           status: parsed.data.publishNow ? ContentStatus.PUBLISHED : ContentStatus.DRAFT,
         },
@@ -107,6 +123,52 @@ export async function createEvent(formData: FormData) {
   revalidatePath("/events");
   revalidatePath("/temple/puja-havan-schedule");
   revalidatePath("/sitemap.xml");
+  redirect("/admin/events?saved=1");
+}
+
+const eventPromotionSchema = z.object({
+  eventId: z.string().min(1),
+  featured: z.boolean(),
+  featuredImageUrl: eventImageSchema,
+});
+
+export async function updateEventPromotion(formData: FormData) {
+  const { adminUser } = await requireAdminPermission("content:manage");
+  const parsed = eventPromotionSchema.safeParse({
+    eventId: formData.get("eventId"),
+    featured: readCheckbox(formData, "featured"),
+    featuredImageUrl: formData.get("featuredImageUrl") ?? "",
+  });
+
+  if (!parsed.success) redirect("/admin/events?error=invalid-event");
+
+  try {
+    const slug = await prisma.$transaction(async (transaction) => {
+      const before = await transaction.event.findUniqueOrThrow({ where: { id: parsed.data.eventId } });
+      const event = await transaction.event.update({
+        where: { id: before.id },
+        data: { featured: parsed.data.featured, featuredImageUrl: parsed.data.featuredImageUrl || null },
+      });
+      await transaction.auditLog.create({
+        data: {
+          adminUserId: adminUser.id,
+          action: "EVENT_PROMOTION_UPDATED",
+          entityType: "Event",
+          entityId: event.id,
+          before: { featured: before.featured, featuredImageUrl: before.featuredImageUrl },
+          after: { featured: event.featured, featuredImageUrl: event.featuredImageUrl },
+        },
+      });
+      return event.slug;
+    });
+    revalidatePath(`/events/${slug}`);
+  } catch {
+    redirect("/admin/events?error=event-update-failed");
+  }
+
+  revalidatePath("/");
+  revalidatePath("/events");
+  revalidatePath("/admin/events");
   redirect("/admin/events?saved=1");
 }
 

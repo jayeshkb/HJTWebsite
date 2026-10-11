@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { HomeHighlights } from "@/components/public/home-highlights";
+import { getHomeBannerEvent } from "@/services/home/public-highlights";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +56,8 @@ const quickActions = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const bannerEvent = await getHomeBannerEvent();
   const templeStructuredData = {
     "@context": "https://schema.org",
     "@type": "Place",
@@ -99,16 +102,39 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="welcome-photo-frame">
-            <Image
-              className="welcome-photo"
-              src="/temple-front.jpg"
-              alt="The Hindu-Jain Temple in Monroeville"
-              fill
-              priority
-              sizes="(max-width: 640px) 92vw, (max-width: 900px) 45vw, 40vw"
-            />
-          </div>
+          {bannerEvent ? (
+            <Link className="welcome-event" href={`/events/${bannerEvent.slug}`}>
+              <div className="welcome-photo-frame">
+                <Image
+                  className={`welcome-photo${bannerEvent.featuredImageUrl ? " welcome-event-photo" : ""}`}
+                  src={bannerEvent.featuredImageUrl || "/temple-front.jpg"}
+                  alt={bannerEvent.featuredImageUrl ? "" : "The Hindu-Jain Temple in Monroeville"}
+                  fill
+                  preload
+                  sizes="(max-width: 640px) 92vw, (max-width: 900px) 208px, 40vw"
+                />
+              </div>
+              <div className="welcome-event-caption">
+                <span className="welcome-event-date">
+                  <CalendarDays size={16} aria-hidden="true" />
+                  <time dateTime={bannerEvent.startsAt.toISOString()}>{formatInTimeZone(bannerEvent.startsAt, "America/New_York", "MMM d, yyyy · h:mm a")} ET</time>
+                </span>
+                <span className="welcome-event-title">{bannerEvent.title}<ArrowRight size={20} aria-hidden="true" /></span>
+                <span className="welcome-event-description">{bannerEvent.shortDescription}</span>
+              </div>
+            </Link>
+          ) : (
+            <div className="welcome-photo-frame">
+              <Image
+                className="welcome-photo"
+                src="/temple-front.jpg"
+                alt="The Hindu-Jain Temple in Monroeville"
+                fill
+                preload
+                sizes="(max-width: 640px) 92vw, (max-width: 900px) 208px, 40vw"
+              />
+            </div>
+          )}
         </div>
         <span className="welcome-rule" aria-hidden="true" />
       </section>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { ContentStatus } from "@prisma/client";
 import { formatInTimeZone } from "date-fns-tz";
-import { createEvent, updateEventStatus } from "./actions";
+import { Save } from "lucide-react";
+import { createEvent, updateEventPromotion, updateEventStatus } from "./actions";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdminPermission } from "@/lib/auth/permissions";
 
@@ -19,7 +20,7 @@ type EventsPageProps = {
 async function getEvents() {
   try {
     const events = await prisma.event.findMany({
-      select: { id: true, title: true, slug: true, startsAt: true, status: true, category: true },
+      select: { id: true, title: true, slug: true, startsAt: true, status: true, category: true, featured: true, featuredImageUrl: true },
       orderBy: { startsAt: "desc" },
       take: 100,
     });
@@ -57,10 +58,21 @@ export default async function AdminEventsPage({ searchParams }: EventsPageProps)
         ) : (
           <div className="admin-record-list">
             {data.events.map((event) => (
-              <article className="admin-record" key={event.id}>
+              <article className="admin-record admin-event-record" key={event.id}>
                 <div>
                   <h3>{event.title}</h3>
                   <p>{event.category} · {formatInTimeZone(event.startsAt, "America/New_York", "yyyy-MM-dd HH:mm")} Eastern · {event.status}</p>
+                  <form className="admin-event-promotion-form" action={updateEventPromotion}>
+                    <input type="hidden" name="eventId" value={event.id} />
+                    <div className="admin-form-field">
+                      <label htmlFor={`event-image-${event.id}`}>Event image URL</label>
+                      <input id={`event-image-${event.id}`} name="featuredImageUrl" type="text" maxLength={2048} defaultValue={event.featuredImageUrl ?? ""} />
+                    </div>
+                    <div className="admin-checkbox-row">
+                      <label><input name="featured" type="checkbox" defaultChecked={event.featured} /> Promote on home banner</label>
+                    </div>
+                    <button className="admin-text-button" type="submit"><Save size={16} aria-hidden="true" /> Save promotion</button>
+                  </form>
                 </div>
                 <form action={updateEventStatus}>
                   <input type="hidden" name="eventId" value={event.id} />
@@ -119,13 +131,17 @@ export default async function AdminEventsPage({ searchParams }: EventsPageProps)
               </select>
             </div>
             <div className="admin-form-field admin-form-field-wide">
+              <label htmlFor="event-image">Event image URL <span>Optional</span></label>
+              <input id="event-image" name="featuredImageUrl" type="text" maxLength={2048} />
+            </div>
+            <div className="admin-form-field admin-form-field-wide">
               <label htmlFor="event-registration-url">Registration URL <span>Optional, https://</span></label>
               <input id="event-registration-url" name="registrationUrl" type="url" />
             </div>
           </div>
           <div className="admin-checkbox-row">
             <label><input name="registrationRequired" type="checkbox" /> Registration required</label>
-            <label><input name="featured" type="checkbox" /> Feature on event list</label>
+            <label><input name="featured" type="checkbox" /> Promote on home banner</label>
             <label><input name="publishNow" type="checkbox" /> Publish immediately</label>
           </div>
           <button className="admin-button admin-button-primary" type="submit">Save event</button>

@@ -31,6 +31,12 @@ npm run db:seed:local
 The seed does not create administrator accounts or payment records. For deployment environments with injected variables, use `npm run db:seed`; it creates role definitions and skips demo content unless the development-only guard passes.
 Demo events, the homepage announcement, and the sample gallery album are public when they are seeded. Do not run the opt-in demo seed against a production database unless you intend those clearly labeled samples to appear on the public site.
 
+## Home Banner Events
+
+In Admin > Events, set an event image URL and check "Promote on home banner", then save. New events offer the same fields. Only published events with a future start time are eligible. The banner picks the nearest upcoming promoted event; if none is promoted, it picks the nearest upcoming published event. If several events are promoted, the earliest start time wins.
+
+The image and caption link to the event detail page. Images may use a local public path (such as `/festival.jpg`), `https://www.hindujaintemple.org/images/...`, or a public Vercel Blob URL. Event images are displayed without cropping. Events without an image use the temple photo; if there are no upcoming events or the database is unavailable, the original temple banner remains.
+
 ## Authentication and Providers
 
 Administrator credentials and sessions are handled by Better Auth and PostgreSQL. Public sign-up is disabled. Two-factor support is configured for TOTP; administrator enrollment and account invitation workflows must be completed before production access is enabled. All admin data operations must use server-side permission checks from `src/lib/auth/permissions.ts`.

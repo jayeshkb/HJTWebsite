@@ -9,6 +9,18 @@ const eventPreviewFields = {
   startsAt: true,
 } satisfies Prisma.EventSelect;
 
+export async function getHomeBannerEvent() {
+  try {
+    return await prisma.event.findFirst({
+      where: { status: ContentStatus.PUBLISHED, startsAt: { gte: new Date() } },
+      select: { ...eventPreviewFields, featuredImageUrl: true, featured: true },
+      orderBy: [{ featured: "desc" }, { startsAt: "asc" }, { id: "asc" }],
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function getPublicHighlights() {
   const now = new Date();
 
