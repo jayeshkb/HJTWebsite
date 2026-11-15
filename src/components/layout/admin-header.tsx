@@ -12,7 +12,7 @@ const adminNavigation = [
   { label: "Gallery", href: "/admin/gallery" },
 ];
 
-export function AdminHeader({ administratorName, canManageFinance }: { administratorName: string; canManageFinance: boolean }) {
+export function AdminHeader({ administratorName, canManageFinance, canManageUsers }: { administratorName: string; canManageFinance: boolean; canManageUsers: boolean }) {
   const router = useRouter();
 
   async function signOut() {
@@ -35,6 +35,7 @@ export function AdminHeader({ administratorName, canManageFinance }: { administr
       <nav className="admin-navigation" aria-label="Administration navigation">
         {adminNavigation.map((item) => <Link href={item.href} key={item.href}>{item.label}</Link>)}
         {canManageFinance && <Link href="/admin/payments">Payments</Link>}
+        {canManageUsers && <Link href="/admin/users">Administrators</Link>}
       </nav>
     </header>
   );
